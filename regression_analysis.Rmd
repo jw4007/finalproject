@@ -18,6 +18,8 @@ library(transformr)
 library(corrplot)
 library(leaps)
 library(kableExtra)
+library(modelr)
+library(mgcv)
 knitr::opts_chunk$set(
  echo = FALSE,
  fig.width = 7, 
@@ -212,6 +214,8 @@ knitr::kable(top_10_low)
 
 ### Statistical analysis
 
+#### Create "motality_per_100k" and "log_motality_per_100k" variables
+
 ```{r}
 regression = maindata %>% 
   mutate(motality_per_100k = val / (population/100000),
@@ -244,16 +248,70 @@ regression %>%
   ylab("") +
   xlab("Estimated log(HIV deaths per 100k)")
 ```
+### Regression models
 
-### 
+### model1:
+
+$$ log(motality/100000) = \beta_0 + \beta_1 age + \beta_2 sex + \beta_3 year + \beta_4 gdp $$
 ```{r}
+regression_0.01 = regression %>% 
+  mutate(log_motality_per_100k = if_else(log_motality_per_100k == -Inf, 0.01, log_motality_per_100k),
+         age_name = as.factor(age_name),
+         sex_name = as.factor(sex_name))
+
+model1 = lm(log_motality_per_100k ~ age_name + sex_name + year + gdp_per_capita, data = regression_0.01)
+kable(summary(model1)$coefficients)
+
+regression_0.01 %>% 
+  add_predictions(model1) %>% 
+  add_residuals(model1) %>% 
+  ggplot(aes(x = pred, y = resid)) + geom_point()
 ```
 
+### model2:
 
+$$ log(motality/100000) = \beta_0 + \beta_1 age + \beta_2 sex + \beta_3 year_{2004} + \beta_4 gdp $$
 ```{r}
+regression_year = regression_0.01 %>% 
+         mutate(year_2004 = if_else(year <= 2004, 1, 0))
+
+  
+model2 = lm(log_motality_per_100k ~ age_name + sex_name + year_2004 + gdp_per_capita, data = regression_year)
+kable(summary(model2)$coefficients)
+
+regression_year %>% 
+  add_predictions(model2) %>% 
+  add_residuals(model2) %>% 
+  ggplot(aes(x = pred, y = resid)) + geom_point()
+
 ```
 
+### model3:
+
+$$ log(motality/100000) = \beta_0 + \beta_1 age + \beta_2 sex + \beta_3 year_{2004} + \beta_4 gdp + \beta_5 age*sex $$
 
 ```{r}
+model3 = lm(log_motality_per_100k ~ age_name + sex_name + year_2004 + gdp_per_capita + age_name*sex_name, data = regression_year)
+
+kable(summary(model3)$coefficients)
+
+regression_year %>% 
+  add_predictions(model3) %>% 
+  add_residuals(model3) %>% 
+  ggplot(aes(x = pred, y = resid)) + geom_point()
+```
+
+### model4:
+$$ log(motality/100000) = \beta_0 + \beta_1 age + \beta_2 sex + \beta_3 year_{2004} + \beta_4 gdp + \beta_5 age*sex + \beta_6 country$$
+
+```{r}
+model4 = lm(log_motality_per_100k ~ age_name + sex_name + year_2004 + gdp_per_capita + age_name*sex_name + country_name, data = regression_year)
+
+kable(summary(model4)$coefficients)
+
+regression_year %>% 
+  add_predictions(model4) %>% 
+  add_residuals(model4) %>% 
+  ggplot(aes(x = pred, y = resid)) + geom_point()
 ```
 
